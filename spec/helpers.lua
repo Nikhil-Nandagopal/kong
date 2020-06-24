@@ -233,10 +233,17 @@ local function truncate_tables(db, tables)
   end
 end
 
-local function bootstrap_database(db)
-  local schema_state = assert(db:schema_state())
+local function bootstrap_database(db, stop_namespace, stop_migration)
+  if stop_namespace then
+    local cn = db.connector
+    assert(cn:connect_migrations())
+    assert(db:schema_reset())
+  end
+
+  local schema_state = assert(db:schema_state(stop_namespace, stop_migration))
   if schema_state.needs_bootstrap then
     assert(db:schema_bootstrap())
+    --schema_state = assert(db:schema_state(stop_namespace, stop_migration))
   end
 
   if schema_state.new_migrations then
@@ -257,6 +264,8 @@ end
 -- @param tables (optional) tables to truncate, this can be used to accelarate
 -- tests if only a few tables are used. By default all tables will be truncated.
 -- @param plugins (optional) array of plugins to mark as loaded. Since kong will load all the bundled plugins by default, this is useful for mostly for marking custom plugins as loaded.
+-- @param stop_namespace (optional) string with a migrations namespace to stop at (example: "kong.db.migrations.core")
+-- @param stop_migration (optional) string with a migrations name to stop at (example: "007_140_to_150")
 -- @return BluePrint, DB
 -- @usage
 -- local PLUGIN_NAME = "my_fancy_plugin"
@@ -273,7 +282,7 @@ end
 --   route = { id = route1.id },
 --   config = {},
 -- }
-local function get_db_utils(strategy, tables, plugins)
+local function get_db_utils(strategy, tables, plugins, stop_namespace, stop_migration)
   strategy = strategy or conf.database
   if tables ~= nil and type(tables) ~= "table" then
     error("arg #2 must be a list of tables to truncate", 2)
@@ -298,7 +307,7 @@ local function get_db_utils(strategy, tables, plugins)
   local db = assert(DB.new(conf, strategy))
   assert(db:init_connector())
 
-  bootstrap_database(db)
+  bootstrap_database(db, stop_namespace, stop_migration)
 
   do
     local database = conf.database
