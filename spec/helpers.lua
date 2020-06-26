@@ -235,15 +235,12 @@ end
 
 local function bootstrap_database(db, stop_namespace, stop_migration)
   if stop_namespace then
-    local cn = db.connector
-    assert(cn:connect_migrations())
     assert(db:schema_reset())
   end
 
   local schema_state = assert(db:schema_state(stop_namespace, stop_migration))
   if schema_state.needs_bootstrap then
     assert(db:schema_bootstrap())
-    --schema_state = assert(db:schema_state(stop_namespace, stop_migration))
   end
 
   if schema_state.new_migrations then
